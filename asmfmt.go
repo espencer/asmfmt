@@ -9,6 +9,8 @@ import (
 	"unicode"
 )
 
+const Comment = ";;"
+
 // Format the input and return the formatted data.
 // If any error is encountered, no data will be returned.
 func Format(in io.Reader) ([]byte, error) {
@@ -106,7 +108,7 @@ func (f *fstate) addLine(b []byte) error {
 	s = strings.TrimSpace(s)
 
 	// Comment is the the only line content.
-	if strings.HasPrefix(s, "//") {
+	if strings.HasPrefix(s, Comment) {
 		// Non-comment content is now added.
 		defer func() {
 			f.anyContents = true
@@ -114,7 +116,7 @@ func (f *fstate) addLine(b []byte) error {
 			f.lastStar = false
 		}()
 
-		s = strings.TrimPrefix(s, "//")
+		s = strings.TrimPrefix(s, Comment)
 		if len(f.queued) > 0 {
 			f.flush()
 		}
@@ -128,12 +130,12 @@ func (f *fstate) addLine(b []byte) error {
 		ts := strings.TrimSpace(s)
 		var q string
 		if (ts != s && len(ts) > 0) || (len(s) > 0 && strings.ContainsAny(string(s[0]), `+/`)) || (len(s) >= 8 && s[:8] == "go:build") {
-			q = fmt.Sprint("//" + s)
+			q = fmt.Sprint(Comment + s)
 		} else if len(ts) > 0 {
 			// Insert a space before the comment
-			q = fmt.Sprint("// " + s)
+			q = fmt.Sprint(Comment + " " + s)
 		} else {
-			q = fmt.Sprint("//")
+			q = fmt.Sprint(Comment)
 		}
 		f.comments = append(f.comments, q)
 		f.lastComment = true
@@ -144,7 +146,7 @@ func (f *fstate) addLine(b []byte) error {
 	if strings.Contains(s, "/*") && !strings.HasSuffix(s, `\`) {
 		starts := strings.Index(s, "/*")
 		ends := strings.Index(s, "*/")
-		lineComment := strings.Index(s, "//")
+		lineComment := strings.Index(s, Comment)
 		if lineComment >= 0 {
 			if lineComment < starts {
 				goto exitcomm
@@ -181,7 +183,7 @@ func (f *fstate) addLine(b []byte) error {
 
 		// Convert single line /* comment */ to // Comment
 		if ends > starts && ends >= len(s)-2 {
-			return f.addLine([]byte("// " + strings.TrimSpace(s[starts+2:ends])))
+			return f.addLine([]byte(Comment + " " + strings.TrimSpace(s[starts+2:ends])))
 		}
 
 		// Comments inside multiline defines.
@@ -326,7 +328,7 @@ func newStatement(s string, defs map[string]struct{}) *statement {
 
 	// Fix where a comment start if any
 	// We need to make sure that the comment isn't embedded in a string literal
-	startcom := strings.Index(s, "//")
+	startcom := strings.Index(s, Comment)
 	startstr := strings.Index(s, "\"")
 	for endstr := 0; startcom > startstr && startstr > endstr; {
 		// This does not check for any escaping (i.e. "\"")
